@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RGB与十六进制颜色码转换</title>
+    <style>
+        :root {
+            --bg: #f3f4f6;
+            --card: #ffffff;
+            --text: #111827;
+            --muted: #6b7280;
+            --border: #d1d5db;
+            --primary: #111827;
+            --primary-hover: #000000;
+            --error: #b91c1c;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 24px 16px;
+        }
+
+        .container {
+            max-width: 920px;
+            margin: 0 auto;
+            display: grid;
+            gap: 14px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            display: grid;
+            gap: 12px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #374151;
+        }
+
+        .row {
+            display: grid;
+            gap: 10px;
+            grid-template-columns: repeat(3, 1fr) 110px 1fr;
+            align-items: center;
+        }
+
+        .row.hex-row {
+            grid-template-columns: 1fr 110px repeat(3, 1fr);
+        }
+
+        label {
+            display: grid;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        input {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 15px;
+            color: var(--text);
+            background: #fff;
+        }
+
+        input[readonly] {
+            background: #f9fafb;
+        }
+
+        .btn {
+            height: 42px;
+            border-radius: 8px;
+            border: 1px solid var(--primary);
+            background: var(--primary);
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .btn:hover {
+            background: var(--primary-hover);
+            border-color: var(--primary-hover);
+        }
+
+        .preview-wrap {
+            display: grid;
+            gap: 10px;
+            grid-template-columns: 160px 1fr;
+            align-items: center;
+        }
+
+        .preview {
+            height: 72px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: #000000;
+        }
+
+        .preview-meta {
+            display: grid;
+            gap: 8px;
+        }
+
+        .meta-line {
+            color: #374151;
+            font-size: 14px;
+        }
+
+        .error {
+            min-height: 20px;
+            font-size: 13px;
+            color: var(--error);
+        }
+
+        @media (max-width: 900px) {
+            .row,
+            .row.hex-row {
+                grid-template-columns: 1fr;
+            }
+
+            .preview-wrap {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <section class="card">
+            <div class="section-title">RGB颜色值转换成十六进制颜色码</div>
+            <div class="row">
+                <label>
+                    R (0-255)
+                    <input id="rInput" type="number" min="0" max="255" value="30">
+                </label>
+                <label>
+                    G (0-255)
+                    <input id="gInput" type="number" min="0" max="255" value="144">
+                </label>
+                <label>
+                    B (0-255)
+                    <input id="bInput" type="number" min="0" max="255" value="255">
+                </label>
+                <button id="rgbToHexBtn" class="btn" type="button">转换</button>
+                <label>
+                    十六进制
+                    <input id="hexResult" type="text" readonly value="#1E90FF">
+                </label>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="section-title">十六进制颜色码转换成RGB颜色值</div>
+            <div class="row hex-row">
+                <label>
+                    十六进制（#RRGGBB 或 #RGB）
+                    <input id="hexInput" type="text" value="#1E90FF">
+                </label>
+                <button id="hexToRgbBtn" class="btn" type="button">转换</button>
+                <label>
+                    R
+                    <input id="rResult" type="text" readonly value="30">
+                </label>
+                <label>
+                    G
+                    <input id="gResult" type="text" readonly value="144">
+                </label>
+                <label>
+                    B
+                    <input id="bResult" type="text" readonly value="255">
+                </label>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="preview-wrap">
+                <div id="colorPreview" class="preview"></div>
+                <div class="preview-meta">
+                    <div id="previewHex" class="meta-line">HEX: #1E90FF</div>
+                    <div id="previewRgb" class="meta-line">RGB: 30, 144, 255</div>
+                </div>
+            </div>
+            <div id="errorMsg" class="error"></div>
+        </section>
+    </main>
+
+    <script>
+        const rInput = document.getElementById("rInput");
+        const gInput = document.getElementById("gInput");
+        const bInput = document.getElementById("bInput");
+        const rgbToHexBtn = document.getElementById("rgbToHexBtn");
+        const hexResult = document.getElementById("hexResult");
+
+        const hexInput = document.getElementById("hexInput");
+        const hexToRgbBtn = document.getElementById("hexToRgbBtn");
+        const rResult = document.getElementById("rResult");
+        const gResult = document.getElementById("gResult");
+        const bResult = document.getElementById("bResult");
+
+        const colorPreview = document.getElementById("colorPreview");
+        const previewHex = document.getElementById("previewHex");
+        const previewRgb = document.getElementById("previewRgb");
+        const errorMsg = document.getElementById("errorMsg");
+
+        function clampColor(value) {
+            const num = Number(value);
+            if (!Number.isFinite(num)) {
+                return null;
+            }
+            return Math.max(0, Math.min(255, Math.round(num)));
+        }
+
+        function toHex2(value) {
+            return value.toString(16).toUpperCase().padStart(2, "0");
+        }
+
+        function rgbToHex(r, g, b) {
+            return `#${toHex2(r)}${toHex2(g)}${toHex2(b)}`;
+        }
+
+        function parseHexColor(input) {
+            const raw = input.trim().replace(/^#/, "");
+            if (/^[0-9a-fA-F]{3}$/.test(raw)) {
+                const r = parseInt(raw[0] + raw[0], 16);
+                const g = parseInt(raw[1] + raw[1], 16);
+                const b = parseInt(raw[2] + raw[2], 16);
+                return { r, g, b };
+            }
+            if (/^[0-9a-fA-F]{6}$/.test(raw)) {
+                const r = parseInt(raw.slice(0, 2), 16);
+                const g = parseInt(raw.slice(2, 4), 16);
+                const b = parseInt(raw.slice(4, 6), 16);
+                return { r, g, b };
+            }
+            return null;
+        }
+
+        function updatePreview(r, g, b) {
+            const hex = rgbToHex(r, g, b);
+            colorPreview.style.backgroundColor = hex;
+            previewHex.textContent = `HEX: ${hex}`;
+            previewRgb.textContent = `RGB: ${r}, ${g}, ${b}`;
+        }
+
+        function setError(text) {
+            errorMsg.textContent = text;
+        }
+
+        function handleRgbToHex() {
+            const r = clampColor(rInput.value);
+            const g = clampColor(gInput.value);
+            const b = clampColor(bInput.value);
+
+            if (r === null || g === null || b === null) {
+                setError("RGB请输入0-255之间的数字。");
+                return;
+            }
+
+            rInput.value = String(r);
+            gInput.value = String(g);
+            bInput.value = String(b);
+
+            const hex = rgbToHex(r, g, b);
+            hexResult.value = hex;
+            hexInput.value = hex;
+            rResult.value = String(r);
+            gResult.value = String(g);
+            bResult.value = String(b);
+            updatePreview(r, g, b);
+            setError("");
+        }
+
+        function handleHexToRgb() {
+            const parsed = parseHexColor(hexInput.value);
+            if (!parsed) {
+                setError("十六进制格式不正确，请输入 #RRGGBB 或 #RGB。");
+                return;
+            }
+
+            const { r, g, b } = parsed;
+            const hex = rgbToHex(r, g, b);
+
+            rResult.value = String(r);
+            gResult.value = String(g);
+            bResult.value = String(b);
+
+            rInput.value = String(r);
+            gInput.value = String(g);
+            bInput.value = String(b);
+            hexResult.value = hex;
+            hexInput.value = hex;
+            updatePreview(r, g, b);
+            setError("");
+        }
+
+        rgbToHexBtn.addEventListener("click", handleRgbToHex);
+        hexToRgbBtn.addEventListener("click", handleHexToRgb);
+
+        [rInput, gInput, bInput].forEach((input) => {
+            input.addEventListener("input", handleRgbToHex);
+        });
+
+        hexInput.addEventListener("input", () => {
+            if (!hexInput.value.trim()) {
+                setError("");
+                return;
+            }
+            const parsed = parseHexColor(hexInput.value);
+            if (parsed) {
+                handleHexToRgb();
+            }
+        });
+
+        handleRgbToHex();
+    </script>
+</body>
+</html>

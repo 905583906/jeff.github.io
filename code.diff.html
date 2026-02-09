@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Diff</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --border-color: #dddddd;
+            --button-bg: #2196f3;
+            --button-hover: #1976d2;
+            --diff-highlight: rgba(255, 196, 0, 0.28);
+            --inline-diff-bg: rgba(255, 153, 0, 0.4);
+            --inline-diff-text: #8a2d00;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #252526;
+            --text-primary: #d4d4d4;
+            --text-secondary: #9d9d9d;
+            --border-color: #3e3e42;
+            --button-bg: #0e639c;
+            --button-hover: #1177bb;
+            --diff-highlight: rgba(255, 196, 0, 0.22);
+            --inline-diff-bg: rgba(255, 153, 0, 0.35);
+            --inline-diff-text: #ffd18a;
+        }
+
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: background-color 0.3s, color 0.3s;
+            overflow: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        [data-theme="dark"] ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        [data-theme="dark"] ::-webkit-scrollbar-thumb {
+            background: #4a4a4a;
+        }
+
+        [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+            background: #5a5a5a;
+        }
+
+        header {
+            background-color: var(--bg-secondary);
+            padding: 0.4rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        h1 {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .theme-toggle {
+            background: none;
+            border: none;
+            font-size: 1.3rem;
+            cursor: pointer;
+            padding: 0.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+            line-height: 1;
+            color: var(--text-primary);
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        .theme-toggle:active {
+            transform: scale(0.95);
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+            min-width: 200px;
+            overflow: hidden;
+        }
+
+        .panel.left {
+            width: 50%;
+            padding-right: 0.5rem;
+        }
+
+        .panel.right {
+            flex: 1;
+            padding-left: 0.5rem;
+        }
+
+        .panel-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .editor-wrap {
+            position: relative;
+            flex: 1;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            overflow: hidden;
+        }
+
+        .highlight {
+            position: absolute;
+            inset: 0;
+            padding: 1rem;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9rem;
+            line-height: 1.45;
+            pointer-events: none;
+            white-space: pre;
+            user-select: none;
+            color: var(--text-primary);
+            z-index: 0;
+            will-change: transform;
+        }
+
+        .hl-line {
+            display: block;
+            min-height: calc(0.9rem * 1.45);
+            white-space: pre;
+            width: max-content;
+            min-width: 100%;
+        }
+
+        .hl-line.diff {
+            background: var(--diff-highlight);
+        }
+
+        .hl-line.equal {
+            background: transparent;
+        }
+
+        .inline-diff {
+            background: var(--inline-diff-bg);
+            color: var(--inline-diff-text);
+            border-radius: 2px;
+        }
+
+        textarea {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            height: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: 4px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9rem;
+            line-height: 1.45;
+            background: transparent;
+            color: transparent;
+            caret-color: var(--text-primary);
+            resize: none;
+            overflow: auto;
+            white-space: pre;
+            word-wrap: normal;
+        }
+
+        textarea::placeholder {
+            color: var(--text-secondary);
+        }
+
+        textarea:focus {
+            outline: 2px solid var(--button-bg);
+            outline-offset: -2px;
+        }
+
+        .divider {
+            width: 2px;
+            background-color: transparent;
+            cursor: col-resize;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 920px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .panel.left,
+            .panel.right {
+                width: 100%;
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            .divider {
+                width: 100%;
+                height: 2px;
+                cursor: row-resize;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Code Diff</h1>
+        <button class="theme-toggle" id="themeToggle" title="切换主题">
+            <span id="themeIcon">🌙</span>
+        </button>
+    </header>
+
+    <div class="container">
+        <div class="panel left" id="leftPanel">
+            <div class="editor-wrap">
+                <pre class="highlight" id="oldHighlight" aria-hidden="true"></pre>
+                <textarea id="oldCode" spellcheck="false" placeholder="粘贴原始代码..."></textarea>
+            </div>
+        </div>
+
+        <div class="divider" id="divider"></div>
+
+        <div class="panel right">
+            <div class="editor-wrap">
+                <pre class="highlight" id="newHighlight" aria-hidden="true"></pre>
+                <textarea id="newCode" spellcheck="false" placeholder="粘贴新代码..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const themeToggle = document.getElementById("themeToggle");
+        const themeIcon = document.getElementById("themeIcon");
+        const divider = document.getElementById("divider");
+        const leftPanel = document.getElementById("leftPanel");
+        const container = document.querySelector(".container");
+
+        const oldCode = document.getElementById("oldCode");
+        const newCode = document.getElementById("newCode");
+        const oldHighlight = document.getElementById("oldHighlight");
+        const newHighlight = document.getElementById("newHighlight");
+
+        function getSystemTheme() {
+            return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+
+        function updateThemeIcon(theme) {
+            themeIcon.textContent = theme === "dark" ? "☀️" : "🌙";
+        }
+
+        function applyTheme(theme) {
+            document.documentElement.setAttribute("data-theme", theme);
+            updateThemeIcon(theme);
+        }
+
+        applyTheme(getSystemTheme());
+
+        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (event) => {
+            applyTheme(event.matches ? "dark" : "light");
+        });
+
+        themeToggle.addEventListener("click", () => {
+            const currentTheme = document.documentElement.getAttribute("data-theme");
+            applyTheme(currentTheme === "dark" ? "light" : "dark");
+        });
+
+        let isResizing = false;
+
+        divider.addEventListener("mousedown", () => {
+            if (window.innerWidth <= 920) {
+                return;
+            }
+            isResizing = true;
+            document.body.style.cursor = "col-resize";
+            document.body.style.userSelect = "none";
+        });
+
+        document.addEventListener("mousemove", (event) => {
+            if (!isResizing) {
+                return;
+            }
+
+            const containerRect = container.getBoundingClientRect();
+            const newLeftWidth = event.clientX - containerRect.left;
+            const containerWidth = containerRect.width;
+            const minWidth = containerWidth * 0.2;
+            const maxWidth = containerWidth * 0.8;
+
+            if (newLeftWidth >= minWidth && newLeftWidth <= maxWidth) {
+                leftPanel.style.width = `${(newLeftWidth / containerWidth) * 100}%`;
+            }
+        });
+
+        document.addEventListener("mouseup", () => {
+            if (!isResizing) {
+                return;
+            }
+            isResizing = false;
+            document.body.style.cursor = "";
+            document.body.style.userSelect = "";
+        });
+
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+        }
+
+        function splitLines(text) {
+            if (text.length === 0) {
+                return [];
+            }
+            return text.replace(/\r\n/g, "\n").split("\n");
+        }
+
+        function computeLineDiff(oldLines, newLines) {
+            const n = oldLines.length;
+            const m = newLines.length;
+
+            if (n * m > 360000) {
+                return null;
+            }
+
+            const dp = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
+
+            for (let i = 1; i <= n; i += 1) {
+                for (let j = 1; j <= m; j += 1) {
+                    if (oldLines[i - 1] === newLines[j - 1]) {
+                        dp[i][j] = dp[i - 1][j - 1] + 1;
+                    } else {
+                        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                    }
+                }
+            }
+
+            const ops = [];
+            let i = n;
+            let j = m;
+
+            while (i > 0 && j > 0) {
+                if (oldLines[i - 1] === newLines[j - 1]) {
+                    ops.push({ type: "equal", oldNo: i, newNo: j });
+                    i -= 1;
+                    j -= 1;
+                } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+                    ops.push({ type: "remove", oldNo: i, newNo: null });
+                    i -= 1;
+                } else {
+                    ops.push({ type: "add", oldNo: null, newNo: j });
+                    j -= 1;
+                }
+            }
+
+            while (i > 0) {
+                ops.push({ type: "remove", oldNo: i, newNo: null });
+                i -= 1;
+            }
+
+            while (j > 0) {
+                ops.push({ type: "add", oldNo: null, newNo: j });
+                j -= 1;
+            }
+
+            return ops.reverse();
+        }
+
+        function plainLineHtml(line) {
+            return line.length ? escapeHtml(line) : "&nbsp;";
+        }
+
+        function computeInlineMask(oldLine, newLine) {
+            const n = oldLine.length;
+            const m = newLine.length;
+
+            if (n === 0 || m === 0 || (n * m) > 20000) {
+                return null;
+            }
+
+            const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+
+            for (let i = 1; i <= n; i += 1) {
+                for (let j = 1; j <= m; j += 1) {
+                    if (oldLine[i - 1] === newLine[j - 1]) {
+                        dp[i][j] = dp[i - 1][j - 1] + 1;
+                    } else {
+                        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                    }
+                }
+            }
+
+            const oldMask = new Array(n).fill(false);
+            const newMask = new Array(m).fill(false);
+
+            let i = n;
+            let j = m;
+            while (i > 0 && j > 0) {
+                if (oldLine[i - 1] === newLine[j - 1]) {
+                    i -= 1;
+                    j -= 1;
+                } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+                    oldMask[i - 1] = true;
+                    i -= 1;
+                } else {
+                    newMask[j - 1] = true;
+                    j -= 1;
+                }
+            }
+
+            while (i > 0) {
+                oldMask[i - 1] = true;
+                i -= 1;
+            }
+
+            while (j > 0) {
+                newMask[j - 1] = true;
+                j -= 1;
+            }
+
+            return { oldMask, newMask };
+        }
+
+        function renderInlineLine(line, mask) {
+            if (!line.length) {
+                return "&nbsp;";
+            }
+            if (!mask) {
+                return plainLineHtml(line);
+            }
+
+            let html = "";
+            let segmentStart = 0;
+            let active = mask[0];
+
+            for (let i = 1; i <= line.length; i += 1) {
+                const next = i < line.length ? mask[i] : null;
+                if (i === line.length || next !== active) {
+                    const chunk = line.slice(segmentStart, i);
+                    const escaped = chunk.length ? escapeHtml(chunk) : "&nbsp;";
+                    html += active ? `<span class="inline-diff">${escaped}</span>` : escaped;
+                    segmentStart = i;
+                    active = next;
+                }
+            }
+            return html;
+        }
+
+        function renderInlinePair(oldLine, newLine) {
+            const maskPair = computeInlineMask(oldLine, newLine);
+            if (!maskPair) {
+                return {
+                    oldHtml: `<span class="inline-diff">${plainLineHtml(oldLine)}</span>`,
+                    newHtml: `<span class="inline-diff">${plainLineHtml(newLine)}</span>`
+                };
+            }
+            return {
+                oldHtml: renderInlineLine(oldLine, maskPair.oldMask),
+                newHtml: renderInlineLine(newLine, maskPair.newMask)
+            };
+        }
+
+        function buildRenderModel(oldLines, newLines) {
+            const oldFlags = new Array(oldLines.length).fill(false);
+            const newFlags = new Array(newLines.length).fill(false);
+            const oldHtml = oldLines.map((line) => plainLineHtml(line));
+            const newHtml = newLines.map((line) => plainLineHtml(line));
+
+            const ops = computeLineDiff(oldLines, newLines);
+            if (!ops) {
+                const maxLen = Math.max(oldLines.length, newLines.length);
+                for (let idx = 0; idx < maxLen; idx += 1) {
+                    const oldLine = oldLines[idx];
+                    const newLine = newLines[idx];
+                    if (oldLine !== newLine) {
+                        if (idx < oldFlags.length) {
+                            oldFlags[idx] = true;
+                        }
+                        if (idx < newFlags.length) {
+                            newFlags[idx] = true;
+                        }
+                        if (idx < oldLines.length && idx < newLines.length) {
+                            const inline = renderInlinePair(oldLines[idx], newLines[idx]);
+                            oldHtml[idx] = inline.oldHtml;
+                            newHtml[idx] = inline.newHtml;
+                        }
+                    }
+                }
+                return { oldFlags, newFlags, oldHtml, newHtml };
+            }
+
+            for (let i = 0; i < ops.length; ) {
+                const op = ops[i];
+                if (op.type === "equal") {
+                    i += 1;
+                    continue;
+                }
+
+                const removeIndices = [];
+                const addIndices = [];
+
+                while (i < ops.length && ops[i].type !== "equal") {
+                    if (ops[i].type === "remove" && ops[i].oldNo !== null) {
+                        removeIndices.push(ops[i].oldNo - 1);
+                        oldFlags[ops[i].oldNo - 1] = true;
+                    } else if (ops[i].type === "add" && ops[i].newNo !== null) {
+                        addIndices.push(ops[i].newNo - 1);
+                        newFlags[ops[i].newNo - 1] = true;
+                    }
+                    i += 1;
+                }
+
+                const pairCount = Math.min(removeIndices.length, addIndices.length);
+                for (let p = 0; p < pairCount; p += 1) {
+                    const oldIdx = removeIndices[p];
+                    const newIdx = addIndices[p];
+                    const inline = renderInlinePair(oldLines[oldIdx], newLines[newIdx]);
+                    oldHtml[oldIdx] = inline.oldHtml;
+                    newHtml[newIdx] = inline.newHtml;
+                }
+            }
+
+            return { oldFlags, newFlags, oldHtml, newHtml };
+        }
+
+        function renderHighlight(el, lines, flags, lineHtmlList) {
+            if (!lines.length) {
+                el.innerHTML = "";
+                return;
+            }
+
+            let html = "";
+            for (let i = 0; i < lines.length; i += 1) {
+                const cls = flags[i] ? "diff" : "equal";
+                html += `<span class="hl-line ${cls}">${lineHtmlList[i]}</span>`;
+            }
+            el.innerHTML = html;
+        }
+
+        function syncOverlayScroll(textarea, overlay) {
+            overlay.style.transform = `translate(${-textarea.scrollLeft}px, ${-textarea.scrollTop}px)`;
+        }
+
+        function refreshDiff() {
+            const oldLines = splitLines(oldCode.value);
+            const newLines = splitLines(newCode.value);
+
+            if (!oldLines.length && !newLines.length) {
+                oldHighlight.innerHTML = "";
+                newHighlight.innerHTML = "";
+                return;
+            }
+
+            const model = buildRenderModel(oldLines, newLines);
+            renderHighlight(oldHighlight, oldLines, model.oldFlags, model.oldHtml);
+            renderHighlight(newHighlight, newLines, model.newFlags, model.newHtml);
+
+            syncOverlayScroll(oldCode, oldHighlight);
+            syncOverlayScroll(newCode, newHighlight);
+        }
+
+        let debounceTimer = null;
+        function refreshDiffDebounced() {
+            if (debounceTimer) {
+                clearTimeout(debounceTimer);
+            }
+            debounceTimer = setTimeout(refreshDiff, 120);
+        }
+
+        oldCode.addEventListener("input", refreshDiffDebounced);
+        newCode.addEventListener("input", refreshDiffDebounced);
+
+        oldCode.addEventListener("scroll", () => {
+            syncOverlayScroll(oldCode, oldHighlight);
+        });
+
+        newCode.addEventListener("scroll", () => {
+            syncOverlayScroll(newCode, newHighlight);
+        });
+
+        oldCode.value = "function sum(a, b) {\n  return a + b;\n}";
+        newCode.value = "function sum(a, b, c = 0) {\n  return a + b + c;\n}";
+
+        refreshDiff();
+    </script>
+</body>
+</html>
